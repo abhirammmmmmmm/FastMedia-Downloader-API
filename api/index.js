@@ -1,4 +1,11 @@
-const ytdl = require('ytdl-core');const fetch = require('node-fetch');const cheerio = require('cheerio');const rateLimit = require('express-rate-limit');const cors = require('cors');// Minimal express-like wrapper for Vercel serverless functions:module.exports = async (req, res) => {
+const ytdl = require('ytdl-core');
+const fetch = require('node-fetch');
+const cheerio = require('cheerio');
+const rateLimit = require('express-rate-limit');
+const cors = require('cors');
+
+// Minimal express-like wrapper for Vercel serverless functions:
+module.exports = async (req, res) => {
   // CORS (allow all origins for demo — tighten in production)
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-api-key');
@@ -17,7 +24,6 @@ const ytdl = require('ytdl-core');const fetch = require('node-fetch');const chee
   }
 
   // Basic rate limiting (in-memory, safe for serverless cold starts but not ideal for scale)
-  // We implement a trivial per-key ratelimit using a global object. For production use Redis.
   if (!global._ratelimit) global._ratelimit = {};
   const key = provided;
   const limit = 200; // requests per hour default (change as needed)
@@ -50,14 +56,14 @@ const ytdl = require('ytdl-core');const fetch = require('node-fetch');const chee
 
       const info = await ytdl.getInfo(videoUrl);
       const formats = info.formats
-        .filter(f => f.contentLength || f.audioBitrate || f.bitrate) // filter useless ones
+        .filter(f => f.contentLength || f.audioBitrate || f.bitrate)
         .map(f => ({
           itag: f.itag,
           mimeType: f.mimeType,
           qualityLabel: f.qualityLabel || null,
           audioBitrate: f.audioBitrate || null,
           approximateSize: f.contentLength ? Number(f.contentLength) : null,
-          url: f.url // direct signed URL returned by ytdl-core
+          url: f.url
         }));
 
       return res.json({
@@ -78,7 +84,6 @@ const ytdl = require('ytdl-core');const fetch = require('node-fetch');const chee
         return;
       }
 
-      // fetch instagram page HTML and parse og:image
       const target = `https://www.instagram.com/${encodeURIComponent(username)}/`;
       const r = await fetch(target, { headers: { 'User-Agent': 'Mozilla/5.0' } });
       if (!r.ok) {
@@ -88,11 +93,9 @@ const ytdl = require('ytdl-core');const fetch = require('node-fetch');const chee
       }
       const html = await r.text();
 
-      // Try to parse JSON LD or meta property og:image
       const $ = cheerio.load(html);
       let dp = $('meta[property="og:image"]').attr('content') || $('meta[name="og:image"]').attr('content');
 
-      // Fallback: try regex for window._sharedData (older pages) — not guaranteed
       if (!dp) {
         const m = html.match(/"profile_pic_url_hd":"([^"]+)"/);
         if (m) dp = m[1].replace(/\\u0026/g, '&').replace(/\\\//g, '/');
